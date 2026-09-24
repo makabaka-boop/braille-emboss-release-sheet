@@ -594,6 +594,161 @@ input[type='number'].input-invalid:focus,
   line-height: 1.7;
 }
 
+/* ---- 压点放行 ---- */
+
+.release-gate h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.release-reasons {
+  margin: 0 0 6px;
+  padding-left: 20px;
+  color: var(--danger);
+}
+
+.release-reasons li {
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.release-can-release {
+  margin: 0 0 4px;
+  color: var(--ok);
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.release-issue {
+  margin-top: 10px;
+}
+
+.release-issue:disabled {
+  background: #93a0b2;
+  cursor: not-allowed;
+}
+
+.release-current {
+  border-color: #9ad5b5;
+  background: var(--ok-soft);
+}
+
+.release-current h2,
+.release-invalidated h2,
+.release-history h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.release-invalidated {
+  border-color: #f0a39c;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.release-invalidated p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.release-permit {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.release-permit.is-current {
+  border-color: #9ad5b5;
+  background: #fff;
+}
+
+.release-permit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.release-id {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.release-time {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.release-badge-current,
+.release-badge-history {
+  display: inline-block;
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.release-badge-current {
+  background: #cdebd9;
+  color: var(--ok);
+}
+
+.release-badge-history {
+  background: #eef2f7;
+  color: var(--muted);
+}
+
+.permit-meta {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 6px 12px;
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.permit-meta dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.permit-meta dd {
+  margin: 0;
+}
+
+.permit-cells .cells {
+  flex-wrap: wrap;
+}
+
+.permit-points {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.permit-points th {
+  text-align: left;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.permit-points td {
+  padding: 6px 10px;
+  border-bottom: 1px dashed var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+.permit-conclusion {
+  margin: 8px 0 10px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
 /* ---- 识读训练工作区 ---- */
 
 .training-note {

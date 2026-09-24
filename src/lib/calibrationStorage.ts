@@ -14,6 +14,8 @@
 import { createDraft, judgeCalibration, type CalibrationDraft, type CalibrationResult } from './calibration';
 
 const STORAGE_KEY = 'braille-plate:calibration:v1';
+/** 校准存档键对外暴露，供跨标签页 storage 监听与测试使用。 */
+export const CALIBRATION_STORAGE_KEY = STORAGE_KEY;
 const CURRENT_STORAGE_VERSION = 2;
 const POINT_COUNT = 6;
 

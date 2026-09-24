@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { planPlate } from './lib/precheck';
 import { encodePhrase } from './lib/braille';
 import { MAX_WIDTH, MIN_WIDTH, validateWidth } from './lib/layout';
@@ -7,10 +7,63 @@ import { compareDrafts, type CompareResult, type DiffOp } from './lib/compare';
 import CellView from './components/CellView.vue';
 import CalibrationWorkspace from './components/CalibrationWorkspace.vue';
 import TrainingWorkspace from './components/TrainingWorkspace.vue';
+import ReleasePanel from './components/ReleasePanel.vue';
+import { CalibrationSession, type CalibrationLiveState } from './lib/releaseSession';
+import { CALIBRATION_STORAGE_KEY, loadCalibrationState } from './lib/calibrationStorage';
 
 const mode = ref<'single' | 'compare' | 'calibration' | 'training'>('single');
 
-// ---- 单稿预检（既有行为，保持不变） ----
+// ---- 压点放行共享的校准会话 ----
+// 单稿预检放行闸门与试压校准工作区共用同一个会话状态机：
+// 只有本次新完成的“合格”判定可放行；刷新 / 跨标签页恢复的旧存档只能展示。
+const calibrationSession = new CalibrationSession();
+const liveCalibration = ref<CalibrationLiveState>(calibrationSession.getLive());
+
+// 页面初始（默认进入单稿预检）即按校准存档恢复历史展示，但不给授权。
+{
+  const restored = loadCalibrationState();
+  if (restored.result && restored.judgedRaws) {
+    calibrationSession.restore({ judgedAt: 0, readings: restored.judgedRaws }, 'load');
+  } else if (restored.draft.readings.some((value) => value.trim() !== '')) {
+    calibrationSession.editReadings(restored.draft.readings);
+  }
+  liveCalibration.value = calibrationSession.getLive();
+}
+
+function onCalibrationLiveChange(live: CalibrationLiveState) {
+  liveCalibration.value = live;
+}
+
+/**
+ * 跨标签页收到校准更新：只能依据完整、版本相符的记录恢复**历史展示**，
+ * 绝不能把另一标签页的旧“合格”单自动当作当前标签页的放行授权。
+ * 因此本标签页已有本次新判定（pass / adjust）时，跨标签事件不降级会话。
+ */
+function onStorage(event: StorageEvent) {
+  if (event.storageArea !== window.localStorage || event.key !== CALIBRATION_STORAGE_KEY) {
+    return;
+  }
+  const current = calibrationSession.getLive();
+  if (current.status === 'pass' || current.status === 'adjust') {
+    return;
+  }
+  const restored = loadCalibrationState();
+  if (restored.warning || !restored.result || !restored.judgedRaws) {
+    calibrationSession.reset();
+    if (restored.draft.readings.some((value) => value.trim() !== '')) {
+      calibrationSession.editReadings(restored.draft.readings);
+    }
+  } else {
+    calibrationSession.restore({ judgedAt: 0, readings: restored.judgedRaws }, 'storage-event');
+  }
+  liveCalibration.value = calibrationSession.getLive();
+}
+window.addEventListener('storage', onStorage);
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', onStorage);
+});
+
+// ---- 单稿预检（既有输入与结论不变，新增放行闸门） ----
 const phrase = ref('');
 const widthInput = ref('12');
 const widthChoices = [4, 8, 12, 16, 20];
@@ -180,6 +233,9 @@ function runCompare() {
         </div>
         <p class="total" data-testid="total-cells">总方数：{{ plan.totalCells }} 方（共 {{ plan.lines.length }} 行，末行不补齐）</p>
       </section>
+
+      <!-- 放行闸门始终展示：非法文字 / 行宽或无当前合格判定时逐项列出阻断原因 -->
+      <ReleasePanel :text="phrase" :width="widthInput" :live="liveCalibration" />
     </template>
 
     <template v-else-if="mode === 'compare'">
@@ -272,7 +328,7 @@ function runCompare() {
     </template>
 
     <template v-else-if="mode === 'calibration'">
-      <CalibrationWorkspace />
+      <CalibrationWorkspace :session="calibrationSession" @live-change="onCalibrationLiveChange" />
     </template>
 
     <TrainingWorkspace v-if="mode === 'training'" />
