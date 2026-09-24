@@ -26,6 +26,11 @@ export interface StoredCalibration {
   warning: CalibrationStorageWarning | null;
   /** true 表示当前显示内容来自受保护的异常存档，用户完成新判定前不得写入。 */
   protected: boolean;
+  /**
+   * 恢复来源的存档版本号：当前版本为 2，兼容恢复的旧版（v1）记录为 1；
+   * 损坏、未知版本或无存档时为 null。放行流程据此拒绝“未重新判定的旧版校准”。
+   */
+  recordVersion: number | null;
 }
 
 export type CalibrationStorageWarningKind =
@@ -131,7 +136,8 @@ export function loadCalibrationState(): StoredCalibration {
     judgedRaws: null,
     result: null,
     warning: null,
-    protected: false
+    protected: false,
+    recordVersion: null
   };
   const store = storage();
   if (!store) {
@@ -177,7 +183,14 @@ export function loadCalibrationState(): StoredCalibration {
         ? displayFromPartial(judgedSource)
         : emptyDraft();
   if (hasVersion && parsed.version !== CURRENT_STORAGE_VERSION) {
-    return { draft: unknownDraft, judgedRaws: null, result: null, warning: makeWarning('unknown-version'), protected: true };
+    return {
+      draft: unknownDraft,
+      judgedRaws: null,
+      result: null,
+      warning: makeWarning('unknown-version'),
+      protected: true,
+      recordVersion: typeof parsed.version === 'number' ? parsed.version : null
+    };
   }
 
   const invalid = (kind: CalibrationStorageWarningKind, shownDraft: CalibrationDraft): StoredCalibration => ({
@@ -185,7 +198,9 @@ export function loadCalibrationState(): StoredCalibration {
     judgedRaws: null,
     result: null,
     warning: makeWarning(isLegacy ? 'old-format' : kind),
-    protected: true
+    protected: true,
+    // 旧版兼容记录标为版本 1；当前版本的损坏记录为 2；无法辨认时为 null。
+    recordVersion: isLegacy ? 1 : hasVersion ? CURRENT_STORAGE_VERSION : null
   });
 
   const partialDraft =
@@ -221,7 +236,14 @@ export function loadCalibrationState(): StoredCalibration {
 
   // 没有 judgedRaws 字段或显式为 null：这是一份六点完整的未提交草稿。
   if (parsed.judgedRaws === undefined || judgedSource === null) {
-    return { draft: displayDraft(draftSix), judgedRaws: null, result: null, warning: null, protected: false };
+    return {
+      draft: displayDraft(draftSix),
+      judgedRaws: null,
+      result: null,
+      warning: null,
+      protected: false,
+      recordVersion: isLegacy ? 1 : CURRENT_STORAGE_VERSION
+    };
   }
   if (!judgedSix) {
     return invalid('corrupted-record', displayedDraft);
@@ -245,7 +267,8 @@ export function loadCalibrationState(): StoredCalibration {
     judgedRaws: judgedSix,
     result,
     warning: null,
-    protected: false
+    protected: false,
+    recordVersion: isLegacy ? 1 : CURRENT_STORAGE_VERSION
   };
 }
 

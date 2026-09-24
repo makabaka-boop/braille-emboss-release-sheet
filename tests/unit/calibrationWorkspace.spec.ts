@@ -1,6 +1,7 @@
 import { createApp, nextTick } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CalibrationWorkspace from '../../src/components/CalibrationWorkspace.vue';
+import { __resetCalibrationSessionForTests, useCalibrationSession } from '../../src/lib/calibrationSession';
 
 const STORAGE_KEY = 'braille-plate:calibration:v1';
 
@@ -44,6 +45,7 @@ describe('CalibrationWorkspace 异常存档保护', () => {
     document.body.innerHTML = '';
     window.localStorage.clear();
     vi.restoreAllMocks();
+    __resetCalibrationSessionForTests();
   });
 
   it('不一致存档只显示草稿和告警；修改不覆盖，重新有效判定后才写入新快照', async () => {
@@ -101,6 +103,41 @@ describe('CalibrationWorkspace 异常存档保护', () => {
     const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
     expect(stored.version).toBe(2);
     expect(stored.judgedRaws).toEqual(legalReadings);
+
+    mounted.unmount();
+  });
+});
+
+describe('CalibrationSession 单例监听脱离组件生命周期', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    window.localStorage.clear();
+    __resetCalibrationSessionForTests();
+  });
+
+  it('工作区卸载再重挂后，改动任一读数仍会让上次判定立即失效并保存草稿', async () => {
+    let mounted = mountCalibration();
+    await fillLegalReadings();
+    await clickJudge();
+    expect(document.querySelector('[data-testid="calibration-result"]')?.getAttribute('data-verdict')).toBe('pass');
+
+    // 离开校准工作区（组件卸载）后再回来：单例的自动保存/失效监听必须仍然有效
+    mounted.unmount();
+    mounted = mountCalibration();
+    await nextTick();
+    await nextTick();
+    expect(document.querySelector('[data-testid="calibration-result"]')?.getAttribute('data-verdict')).toBe('pass');
+
+    const session = useCalibrationSession();
+    session.readings.value[2] = '0.65';
+    await nextTick();
+    await nextTick();
+
+    expect(document.querySelector('[data-testid="calibration-result"]')).toBeNull();
+    // 改动已作为新草稿保存，刷新后按未判定草稿恢复（而不是旧的合格快照）
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    expect(stored.judgedRaws).toBeNull();
+    expect(stored.draft.readings[2]).toBe('0.65');
 
     mounted.unmount();
   });

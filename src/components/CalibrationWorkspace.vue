@@ -1,130 +1,34 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import {
   MAX_HEIGHT,
   MAX_SPREAD,
   MIN_HEIGHT,
-  POINT_COUNT,
   POINT_LABELS,
-  createDraft,
-  formatHeight,
-  judgeCalibration,
-  type CalibrationResult,
-  type PointJudgmentView,
-  type PointReadingView
+  formatHeight
 } from '../lib/calibration';
-import { clearCalibrationState, loadCalibrationState, saveCalibrationState } from '../lib/calibrationStorage';
+import { useCalibrationSession } from '../lib/calibrationSession';
 
 /**
- * 试压校准工作区：只消费校准领域服务输出的契约，
+ * 试压校准工作区：只消费校准会话输出的契约，
  * 不读取也不改写单稿预检或双稿核对的任何状态。
- * 未提交草稿与成功判定所用读数自动存入 localStorage，刷新后恢复。
+ * 未提交草稿与成功判定所用读数自动存入 localStorage，刷新后恢复；
+ * 同一份会话也被压点放行页只读共享。
  */
-const restored = loadCalibrationState();
-
-const readings = ref<string[]>(restored.draft.readings.slice());
-const result = ref<CalibrationResult | null>(restored.result);
-const judgedRaws = ref<string[] | null>(restored.judgedRaws);
-const archiveWarning = ref(restored.warning?.message ?? null);
-const isProtectedArchive = ref(restored.protected);
-const storageError = ref<string | null>(null);
-let skipNextDraftWatch = false;
-
-const pointIndices = Array.from({ length: POINT_COUNT }, (_, index) => index);
-
-const blockedReadings = computed<PointReadingView[]>(() =>
-  result.value?.verdict === 'blocked' ? result.value.readings : []
-);
-
-const judgedPoints = computed<PointJudgmentView[]>(() =>
-  result.value?.verdict === 'pass' || result.value?.verdict === 'adjust' ? result.value.readings : []
-);
+const {
+  readings,
+  result,
+  archiveWarning,
+  storageError,
+  pointIndices,
+  runJudge,
+  resetAll,
+  pointError,
+  judgedPoint
+} = useCalibrationSession();
 
 const threshold = computed(() =>
   result.value?.verdict === 'pass' || result.value?.verdict === 'adjust' ? result.value.threshold : null
-);
-
-function pointError(index: number): string | null {
-  return blockedReadings.value[index]?.error?.message ?? null;
-}
-
-function judgedPoint(index: number): PointJudgmentView | null {
-  return judgedPoints.value[index] ?? null;
-}
-
-function runJudge() {
-  const judged = judgeCalibration(readings.value);
-  result.value = judged;
-  if (judged.verdict === 'blocked') {
-    // 无效读数只构成输入受阻，不保留为本次判定结果，也不覆盖受保护原存档。
-    judgedRaws.value = null;
-    return;
-  }
-
-  const snapshot = readings.value.slice();
-  const saved = saveCalibrationState({ readings: snapshot }, snapshot);
-  if (saved) {
-    judgedRaws.value = snapshot;
-    archiveWarning.value = null;
-    storageError.value = null;
-    isProtectedArchive.value = false;
-  } else {
-    judgedRaws.value = snapshot;
-    isProtectedArchive.value = true;
-    storageError.value =
-      '浏览器本地存储写入失败（可能是配额不足或权限受限）：本次判定未写入，原始存档仍保留。修复存储问题后请重新执行判定；在此之前任何修改都不会覆盖原存档。';
-  }
-}
-
-function resetAll() {
-  if (isProtectedArchive.value) {
-    storageError.value = '原始校准存档仍在保护中：请核对并重新执行判定；在新的有效判定写入前不能清空覆盖。';
-    return;
-  }
-
-  const cleared = clearCalibrationState();
-  if (!cleared) {
-    storageError.value = '清空本地校准存档失败：原存档仍保留，请检查浏览器存储权限。';
-    return;
-  }
-
-  skipNextDraftWatch = true;
-  readings.value = createDraft().readings;
-  result.value = null;
-  judgedRaws.value = null;
-  archiveWarning.value = null;
-  storageError.value = null;
-}
-
-// 判定之后只要任一读数再被改动，上次结论立即失效。
-// 异常存档处于保护态时，用户修改只保留在内存取证，不自动覆盖 localStorage。
-watch(
-  readings,
-  (values) => {
-    if (skipNextDraftWatch) {
-      skipNextDraftWatch = false;
-      return;
-    }
-
-    if (result.value !== null) {
-      result.value = null;
-      judgedRaws.value = null;
-    }
-    if (isProtectedArchive.value) {
-      storageError.value = '原存档异常且处于保护中：当前修改仅用于本次核对，重新执行有效判定前不会写入或覆盖原存档。';
-      return;
-    }
-
-    const saved = saveCalibrationState({ readings: values.slice() }, null);
-    if (saved) {
-      storageError.value = null;
-    } else {
-      isProtectedArchive.value = true;
-      storageError.value =
-        '草稿保存失败（可能是配额不足或权限受限）：浏览器仍保留最近一次可恢复的本地记录；后续修改将继续留在本次会话，不会覆盖原存档。';
-    }
-  },
-  { deep: true }
 );
 </script>
 

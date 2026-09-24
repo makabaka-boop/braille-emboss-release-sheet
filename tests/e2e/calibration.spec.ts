@@ -284,12 +284,9 @@ test.describe('异常存档恢复与写入安全', () => {
     const original = JSON.stringify(archive);
 
     await page.evaluate(() => {
-      Object.defineProperty(window.localStorage, 'setItem', {
-        configurable: true,
-        value: () => {
-          throw new DOMException('quota exceeded', 'QuotaExceededError');
-        }
-      });
+      Storage.prototype.setItem = () => {
+        throw new DOMException('quota exceeded', 'QuotaExceededError');
+      };
     });
 
     await fillHeights(page, legalDraft);

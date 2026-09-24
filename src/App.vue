@@ -4,15 +4,16 @@ import { planPlate } from './lib/precheck';
 import { encodePhrase } from './lib/braille';
 import { MAX_WIDTH, MIN_WIDTH, validateWidth } from './lib/layout';
 import { compareDrafts, type CompareResult, type DiffOp } from './lib/compare';
+import { useDraftSession } from './lib/draftSession';
 import CellView from './components/CellView.vue';
 import CalibrationWorkspace from './components/CalibrationWorkspace.vue';
 import TrainingWorkspace from './components/TrainingWorkspace.vue';
+import ReleaseWorkspace from './components/ReleaseWorkspace.vue';
 
-const mode = ref<'single' | 'compare' | 'calibration' | 'training'>('single');
+const mode = ref<'single' | 'release' | 'compare' | 'calibration' | 'training'>('single');
 
-// ---- 单稿预检（既有行为，保持不变） ----
-const phrase = ref('');
-const widthInput = ref('12');
+// ---- 单稿预检（既有行为，保持不变；输入与放行页共享同一份草稿会话） ----
+const { text: phrase, width: widthInput } = useDraftSession();
 const widthChoices = [4, 8, 12, 16, 20];
 
 const plan = computed(() => planPlate(phrase.value, widthInput.value));
@@ -87,6 +88,17 @@ function runCompare() {
         @click="mode = 'calibration'"
       >
         试压校准
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="mode-btn"
+        :class="{ active: mode === 'release' }"
+        :aria-selected="mode === 'release'"
+        data-testid="mode-release"
+        @click="mode = 'release'"
+      >
+        压点放行
       </button>
       <button
         type="button"
@@ -273,6 +285,10 @@ function runCompare() {
 
     <template v-else-if="mode === 'calibration'">
       <CalibrationWorkspace />
+    </template>
+
+    <template v-else-if="mode === 'release'">
+      <ReleaseWorkspace />
     </template>
 
     <TrainingWorkspace v-if="mode === 'training'" />
